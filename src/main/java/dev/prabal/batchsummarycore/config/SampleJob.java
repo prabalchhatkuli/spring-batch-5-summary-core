@@ -2,6 +2,7 @@ package dev.prabal.batchsummarycore.config;
 
 import dev.prabal.batchsummarycore.listener.FirstJobListener;
 import dev.prabal.batchsummarycore.listener.FirstStepListener;
+import dev.prabal.batchsummarycore.model.StudentCsv;
 import dev.prabal.batchsummarycore.service.SecondTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -23,11 +24,18 @@ import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
+import org.springframework.batch.item.file.mapping.DefaultLineMapper;
+import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.transaction.PlatformTransactionManager;
+
+import java.io.File;
 
 @Configuration
 public class SampleJob extends DefaultBatchConfiguration{
@@ -84,13 +92,49 @@ public class SampleJob extends DefaultBatchConfiguration{
     @Bean
     Step firstChunkStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader firstItemReader, ItemWriter firstItemWriter, ItemProcessor firstItemProcessor){
         return new StepBuilder("First Chunk Step", jobRepository)
-                .<Integer, Long>chunk(3, platformTransactionManager)
-                .reader(firstItemReader)
-                .processor(firstItemProcessor)
+                //.<Integer, Long>chunk(3, platformTransactionManager)
+                //.reader(firstItemReader)
+                .<StudentCsv, StudentCsv>chunk(3, platformTransactionManager)
+                .reader(flatFileItemReader())
+                //.processor(firstItemProcessor)
                 .writer(firstItemWriter)
                 .build();
     }
 
+    public FlatFileItemReader<StudentCsv> flatFileItemReader(){
+        FlatFileItemReader<StudentCsv> flatFileItemReader = new FlatFileItemReader<StudentCsv>();
+
+        //set file location
+        flatFileItemReader.setResource(new FileSystemResource(
+                new File("/Users/prabalchhatkuli/Desktop/projects/batch-summary-core/input/students.csv")));
+
+        //flatfile item reader -- line mapper
+        flatFileItemReader.setLineMapper(new DefaultLineMapper<StudentCsv>(){
+            {
+                setLineTokenizer(new DelimitedLineTokenizer(){
+                    {
+                        //delimeter is comma by default can override
+                        //set column headers for csv
+                        setNames("ID","First Name","Last Name","Email");
+                    }
+                });
+
+                setFieldSetMapper(new BeanWrapperFieldSetMapper<StudentCsv>(){
+                    {
+                        //bean mapper
+                        setTargetType(StudentCsv.class);
+                    }
+                });
+            }
+        });
+
+        //skip the first line because it is column names
+        flatFileItemReader.setLinesToSkip(1);
+
+        return flatFileItemReader;
+    }
+
+    //Need this bean for stopping the job
     @Bean
     public JobRegistryBeanPostProcessor jobRegistryBeanPostProcessor(JobRegistry jobRegistry) {
         final JobRegistryBeanPostProcessor answer = new JobRegistryBeanPostProcessor();
