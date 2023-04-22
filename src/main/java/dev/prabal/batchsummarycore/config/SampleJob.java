@@ -9,14 +9,12 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.StepContribution;
 
 import org.springframework.batch.core.configuration.JobRegistry;
-import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.configuration.support.DefaultBatchConfiguration;
 import org.springframework.batch.core.configuration.support.JobRegistryBeanPostProcessor;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.ExecutionContextSerializer;
 import org.springframework.batch.core.repository.JobRepository;
-import org.springframework.batch.core.repository.dao.DefaultExecutionContextSerializer;
 import org.springframework.batch.core.repository.dao.Jackson2ExecutionContextStringSerializer;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -29,6 +27,7 @@ import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -90,32 +89,36 @@ public class SampleJob extends DefaultBatchConfiguration{
     }
 
     @Bean
-    Step firstChunkStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader firstItemReader, ItemWriter firstItemWriter, ItemProcessor firstItemProcessor){
+    Step firstChunkStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader firstItemReader, ItemWriter firstItemWriter, ItemProcessor firstItemProcessor, FlatFileItemReader<StudentCsv> flatFileItemReader){
         return new StepBuilder("First Chunk Step", jobRepository)
                 //.<Integer, Long>chunk(3, platformTransactionManager)
                 //.reader(firstItemReader)
                 .<StudentCsv, StudentCsv>chunk(3, platformTransactionManager)
-                .reader(flatFileItemReader())
+                .reader(flatFileItemReader)
                 //.processor(firstItemProcessor)
                 .writer(firstItemWriter)
                 .build();
     }
-
-    public FlatFileItemReader<StudentCsv> flatFileItemReader(){
+    @Bean
+    @StepScope
+    public FlatFileItemReader<StudentCsv> flatFileItemReader(@Value("#{jobParameters['inputFile']}") String inputFile){
         FlatFileItemReader<StudentCsv> flatFileItemReader = new FlatFileItemReader<StudentCsv>();
 
+        System.out.println(inputFile);
+        System.out.println("-------------------------");
         //set file location
         flatFileItemReader.setResource(new FileSystemResource(
-                new File("/Users/prabalchhatkuli/Desktop/projects/batch-summary-core/input/students.csv")));
+                new File(inputFile)));
 
         //flatfile item reader -- line mapper
         flatFileItemReader.setLineMapper(new DefaultLineMapper<StudentCsv>(){
             {
-                setLineTokenizer(new DelimitedLineTokenizer(){
+                setLineTokenizer(new DelimitedLineTokenizer("|"){
                     {
                         //delimeter is comma by default can override
                         //set column headers for csv
                         setNames("ID","First Name","Last Name","Email");
+                        //setDelimiter("|");
                     }
                 });
 
