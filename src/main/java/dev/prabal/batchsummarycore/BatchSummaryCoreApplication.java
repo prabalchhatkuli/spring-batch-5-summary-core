@@ -2,6 +2,7 @@ package dev.prabal.batchsummarycore;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -12,6 +13,8 @@ public class BatchSummaryCoreApplication {
 
     public static void main(String[] args) {
 /*
+
+        //one way to start multiple jobs
         ApplicationContext ctx = SpringApplication.run(BatchSummaryCoreApplication.class, args);
         JobLauncher jobLauncher = (JobLauncher) ctx.getBean("jobLauncher");
 
@@ -21,7 +24,6 @@ public class BatchSummaryCoreApplication {
         jobLauncher.run(job2,new JobParameters());
 
  */
-        SpringApplication.run(BatchSummaryCoreApplication.class, args);
+        System.exit(SpringApplication.exit(new SpringApplicationBuilder(BatchSummaryCoreApplication.class).run(args)));
     }
-
 }

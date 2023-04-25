@@ -3,6 +3,7 @@ package dev.prabal.batchsummarycore.config;
 import dev.prabal.batchsummarycore.listener.FirstJobListener;
 import dev.prabal.batchsummarycore.listener.FirstStepListener;
 import dev.prabal.batchsummarycore.model.StudentCsv;
+import dev.prabal.batchsummarycore.model.StudentJson;
 import dev.prabal.batchsummarycore.service.SecondTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -28,6 +29,8 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.item.json.JacksonJsonObjectReader;
+import org.springframework.batch.item.json.JsonItemReader;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.batch.JobLauncherApplicationRunner;
@@ -99,12 +102,15 @@ public class SampleJob extends DefaultBatchConfiguration{
     }
 
     @Bean
-    Step firstChunkStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader firstItemReader, ItemWriter firstItemWriter, ItemProcessor firstItemProcessor, FlatFileItemReader<StudentCsv> flatFileItemReader){
+    Step firstChunkStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader firstItemReader,
+                        ItemWriter firstItemWriter, ItemProcessor firstItemProcessor, FlatFileItemReader<StudentCsv> flatFileItemReader,
+                        JsonItemReader<StudentJson> JsonItemReader){
         return new StepBuilder("First Chunk Step", jobRepository)
                 //.<Integer, Long>chunk(3, platformTransactionManager)
                 //.reader(firstItemReader)
-                .<StudentCsv, StudentCsv>chunk(3, platformTransactionManager)
-                .reader(flatFileItemReader)
+                .<StudentJson, StudentJson>chunk(3, platformTransactionManager)
+                //.reader(flatFileItemReader)
+                .reader(JsonItemReader)
                 //.processor(firstItemProcessor)
                 .writer(firstItemWriter)
                 .build();
@@ -147,7 +153,23 @@ public class SampleJob extends DefaultBatchConfiguration{
         return flatFileItemReader;
     }
 
-    //Need this bean for stopping the job
+    @Bean
+    @StepScope
+    public JsonItemReader<StudentJson> jsonItemReader(@Value("#{jobParameters['inputFile']}") String inputFile){
+        JsonItemReader<StudentJson> jsonItemReader =
+                new JsonItemReader<>();
+        jsonItemReader.setResource(new FileSystemResource(
+                new File(inputFile)));
+        jsonItemReader.setJsonObjectReader(new JacksonJsonObjectReader<>(StudentJson.class));
+
+        //only ready 8 items from the top of the json list
+        jsonItemReader.setMaxItemCount(8);
+        jsonItemReader.setCurrentItemCount(2);
+
+        return jsonItemReader;
+    }
+
+    //Need this bean for stopping the job, otherwise not needed
     @Bean
     public JobRegistryBeanPostProcessor jobRegistryBeanPostProcessor(JobRegistry jobRegistry) {
         final JobRegistryBeanPostProcessor answer = new JobRegistryBeanPostProcessor();
